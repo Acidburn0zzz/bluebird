@@ -1,9 +1,15 @@
-global.useBluebird = true;
-global.useQ = false;
-var bluebird = require('../../js/release/bluebird.js');
+global.useNative = true;
+
+try {
+    if (Promise.race.toString() !== 'function race() { [native code] }')
+        throw 0;
+} catch (e) {
+    throw new Error("No ES6 promises available");
+}
+var watt = require("watt");
 require('../lib/fakesP');
 
-module.exports = bluebird.coroutine(function* upload(stream, idOrPath, tag, done) {
+module.exports = watt(function * (stream, idOrPath, tag, done) {
     try {
         var blob = blobManager.create(account);
         var tx = db.begin();

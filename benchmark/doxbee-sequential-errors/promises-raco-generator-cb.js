@@ -1,14 +1,14 @@
-global.useBluebird = true;
+global.useraco = true;
 global.useQ = false;
-var bluebird = require('../../js/release/bluebird.js');
+var raco = require('raco');
 require('../lib/fakesP');
 
-module.exports = bluebird.coroutine(function* upload(stream, idOrPath, tag, done) {
+module.exports = raco.wrap(function* upload(stream, idOrPath, tag, done) {
     try {
         var blob = blobManager.create(account);
         var tx = db.begin();
-        var blobId = yield blob.put(stream);
-        var file = yield self.byUuidOrPath(idOrPath).get();
+        var blobId = yield blob.put(stream, done);
+        var file = yield self.byUuidOrPath(idOrPath).get(done);
 
         var previousId = file ? file.version : null;
         version = {
@@ -19,7 +19,8 @@ module.exports = bluebird.coroutine(function* upload(stream, idOrPath, tag, done
             previousId: previousId,
         };
         version.id = Version.createHash(version);
-        yield Version.insert(version).execWithin(tx);
+        yield Version.insert(version).execWithin(tx, done);
+        triggerIntentionalError();
         if (!file) {
             var splitPath = idOrPath.split('/');
             var fileName = splitPath[splitPath.length - 1];
@@ -29,17 +30,20 @@ module.exports = bluebird.coroutine(function* upload(stream, idOrPath, tag, done
                 name: fileName,
                 version: version.id
             }
-            var query = yield self.createQuery(idOrPath, file);
-            yield query.execWithin(tx);
+            var query = yield self.createQuery(idOrPath, file, done);
+            yield query.execWithin(tx, done);
+            triggerIntentionalError();
         }
         yield FileVersion.insert({fileId: file.id, versionId: version.id})
-            .execWithin(tx);
+            .execWithin(tx, done);
+        triggerIntentionalError();
         yield File.whereUpdate({id: file.id}, {version: version.id})
-            .execWithin(tx);
-        yield tx.commit();
+            .execWithin(tx, done);
+        triggerIntentionalError();
+        tx.commit();
         done();
     } catch (err) {
-        yield tx.rollback();
+        tx.rollback();
         done(err);
     }
 });
